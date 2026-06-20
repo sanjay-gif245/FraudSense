@@ -139,7 +139,7 @@ cd FraudSense
 
 Download `creditcard_balanced.csv` from the link below and place it at `backend/data/creditcard_balanced.csv`:
 
-> 📥 **[Download Dataset (Google Drive)](https://drive.google.com/file/d/1M_hme69YE7_X0tqxWOLbalyzJI2FYef2/view?usp=sharing)**
+> 📥 **[Download Dataset (GitHub Releases)](https://github.com/sanjay-gif245/FraudSense/releases/tag/v1.0)**
 
 ```
 backend/data/creditcard_balanced.csv
