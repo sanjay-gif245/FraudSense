@@ -1,6 +1,5 @@
 # Dataset (too large for GitHub)
 backend/data/creditcard.csv
-backend/data/creditcard_balanced.csv
 backend/data/*.csv
 
 # Python
