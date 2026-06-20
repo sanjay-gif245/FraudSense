@@ -137,14 +137,14 @@ cd FraudSense
 
 ### 2. Download the Dataset
 
-Download the **Credit Card Fraud Detection** dataset from Kaggle and place the CSV at:
+Download `creditcard_balanced.csv` from the link below and place it at `backend/data/creditcard_balanced.csv`:
+
+> 📥 **[Download Dataset (Google Drive)](https://drive.google.com/file/d/1M_hme69YE7_X0tqxWOLbalyzJI2FYef2/view?usp=sharing)**
 
 ```
 backend/data/creditcard_balanced.csv
 ```
 
-> Dataset: `creditcard_balanced.csv` — a balanced version of the Kaggle Credit Card Fraud Detection dataset
->
 > ⚠️ If the CSV is not present, the app falls back to a 5,000-row synthetic dataset that mimics the real distribution — the app runs end-to-end but benchmark metrics will differ.
 
 ### 3. Install Backend Dependencies
