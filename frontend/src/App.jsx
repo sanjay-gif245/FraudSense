@@ -36,6 +36,7 @@ export default function App() {
   const [framework, setFramework] = useState(null)
   const [transactions, setTransactions] = useState([])
   const [flaggedTransactions, setFlaggedTransactions] = useState([])
+  const [clearedTransactions, setClearedTransactions] = useState([])
   const [showMetrics, setShowMetrics] = useState(false)
   const [activePage, setActivePage] = useState('overview')
   const [loading, setLoading] = useState(true)
@@ -62,6 +63,8 @@ export default function App() {
           setTransactions((prev) => [entry, ...prev].slice(0, 50))
           if (txn.is_flagged) {
             setFlaggedTransactions((prev) => [entry, ...prev])
+          } else {
+            setClearedTransactions((prev) => [entry, ...prev].slice(0, 50))
           }
           setError(null)
           setLoading(false)
@@ -165,14 +168,32 @@ export default function App() {
           )}
 
           {activePage === 'frauds' && (
-            <TransactionFeed
-              transactions={flaggedTransactions}
-              onFeedback={handleFeedback}
-              loading={loading && !error}
-              error={null}
-              emptyTitle="No fraud flags yet"
-              emptyDesc="High-risk transactions identified by the model will be listed here for analyst review."
-            />
+            <>
+              <TransactionFeed
+                transactions={flaggedTransactions}
+                onFeedback={handleFeedback}
+                loading={loading && !error}
+                error={null}
+                title="Detected as Fraud"
+                subtitle="Transactions flagged as high risk by the scoring pipeline"
+                badgeLabel="Flagged"
+                badgeTone="red"
+                emptyTitle="No fraud flags yet"
+                emptyDesc="High-risk transactions identified by the model will be listed here for analyst review."
+              />
+              <TransactionFeed
+                transactions={clearedTransactions}
+                onFeedback={handleFeedback}
+                loading={loading && !error}
+                error={null}
+                title="Cleared (Legitimate)"
+                subtitle="Transactions scored below the fraud threshold and treated as legal"
+                badgeLabel="Cleared"
+                badgeTone="green"
+                emptyTitle="No cleared transactions yet"
+                emptyDesc="Transactions scored as legitimate by the pipeline will be listed here."
+              />
+            </>
           )}
 
           {activePage === 'metrics' && (

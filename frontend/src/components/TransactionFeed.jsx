@@ -31,17 +31,21 @@ export default function TransactionFeed({
   transactions, onFeedback, loading, error,
   emptyTitle = 'No transactions yet',
   emptyDesc = "New transactions will appear here automatically as they're scored by the pipeline.",
+  title = 'Live Transaction Stream',
+  subtitle = 'Sampled from the production dataset and scored in real time',
+  badgeLabel = 'Streaming',
+  badgeTone = 'accent',
 }) {
   return (
     <div className="card">
       <div className="card-header">
         <div className="card-header-text">
-          <div className="title">Live Transaction Stream</div>
-          <div className="subtitle">Sampled from the production dataset and scored in real time</div>
+          <div className="title">{title}</div>
+          <div className="subtitle">{subtitle}</div>
         </div>
-        <span className="badge accent">
+        <span className={`badge ${badgeTone}`}>
           <span className="pulse-dot" />
-          Streaming
+          {badgeLabel}
         </span>
       </div>
 
