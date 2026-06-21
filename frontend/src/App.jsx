@@ -95,7 +95,18 @@ export default function App() {
     }).then(() => {
       const markReviewed = (t) => (t.id === id ? { ...t, feedbackGiven: true } : t)
       setTransactions((prev) => prev.map(markReviewed))
-      setFlaggedTransactions((prev) => prev.map(markReviewed))
+
+      if (actualFraud) {
+        setFlaggedTransactions((prev) => prev.map(markReviewed))
+      } else {
+        // Analyst marked it OK — move it out of the fraud list and into Cleared.
+        setFlaggedTransactions((prev) => prev.filter((t) => t.id !== id))
+        setClearedTransactions((prev) => {
+          const moved = transactions.find((t) => t.id === id) || flaggedTransactions.find((t) => t.id === id)
+          if (!moved) return prev
+          return [{ ...moved, feedbackGiven: true, is_flagged: false }, ...prev].slice(0, 50)
+        })
+      }
     })
   }
 
