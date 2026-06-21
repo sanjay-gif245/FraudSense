@@ -179,18 +179,28 @@ npm install
 
 ## 🖥️ Running the Project
 
+### Option A — One Command (Recommended)
+
+```bash
+./run.sh
+```
+
+This starts the backend, waits until it's ready, then starts the frontend — both in one terminal. Press `Ctrl+C` to stop both. Requires the backend `.venv` and frontend `node_modules` to already be installed (see Installation & Setup above).
+
+### Option B — Two Terminals (Manual)
+
 You need **two terminals open at the same time** — one for the backend, one for the frontend. Both must keep running while you use the app.
 
-### Terminal 1 — Start the Backend
+**Terminal 1 — Start the Backend**
 
 ```bash
 cd backend
 .venv/bin/uvicorn main:app --reload --port 8000
 ```
 
-> The server trains the Random Forest model on startup. With the full dataset this takes ~30–60 seconds.
+> The server trains the Random Forest model on startup. With the full dataset this takes ~30–60 seconds. **Wait for `Application startup complete` before opening the frontend** — if you open the dashboard too early (or skip this step entirely) you'll see "Connection lost" / `ECONNREFUSED` errors, because the frontend has nothing to talk to yet.
 
-### Terminal 2 — Start the Frontend
+**Terminal 2 — Start the Frontend**
 
 ```bash
 cd frontend
@@ -198,6 +208,17 @@ npm run dev
 ```
 
 Open **[http://localhost:5173](http://localhost:5173)** in your browser.
+
+---
+
+### ⚠️ Troubleshooting: "Connection lost" / `ECONNREFUSED` / `http proxy error`
+
+This means the **frontend is running but the backend is not** — the dashboard has no server to fetch data from. Fix:
+
+1. Check you have a **second terminal** running the backend (`uvicorn main:app ...`) — it's easy to only start the frontend and forget the backend.
+2. In that backend terminal, confirm you see `INFO: Application startup complete`. If you see a Python traceback instead, read the error — it usually means `requirements.txt` wasn't installed or the dataset CSV is missing/corrupted.
+3. If the backend terminal was closed or crashed, restart it with the command above.
+4. Easiest fix: use `./run.sh` instead, which starts both automatically and won't let you forget one.
 
 ---
 
