@@ -54,6 +54,18 @@ fusion_score = 0.60 × ml_score + 0.40 × rule_score
 
 A transaction is flagged when `fusion_score > current_threshold` (adaptive, starts at 0.6).
 
+**Risk Level criteria** (shown in the dashboard as Low / Medium / High) is derived directly from the `fusion_score`:
+
+| Fusion Score | Risk Level |
+| :--- | :--- |
+| `> 0.7` | 🔴 High |
+| `0.4 – 0.7` | 🟡 Medium |
+| `< 0.4` | 🟢 Low |
+
+This is separate from `is_flagged` (the binary fraud/not-fraud decision), which uses the adaptive `current_threshold` instead — so a transaction can show "Medium" risk visually while still being below the flagging threshold.
+
+**Scope of analysis:** FraudSense scores transactions at the level of an entire bank's transaction stream, not a single customer's account. Each simulated transaction is sampled independently from the full Kaggle dataset (which itself aggregates anonymized card transactions across many cardholders). The model has no concept of "this card's history" — it scores each transaction purely on its own feature values (amount, time-of-day, and the 28 anonymized `V1`–`V28` PCA features). Per-account behavioral profiling (e.g. "this is unusual *for this specific customer*") is a natural extension but is not implemented here — see Future Roadmap.
+
 ### 4. 🔄 Adaptive Analyst Feedback Loop
 Analysts review flagged transactions directly in the dashboard:
 
@@ -167,16 +179,18 @@ npm install
 
 ## 🖥️ Running the Project
 
-### Start the Backend
+You need **two terminals open at the same time** — one for the backend, one for the frontend. Both must keep running while you use the app.
+
+### Terminal 1 — Start the Backend
 
 ```bash
 cd backend
 .venv/bin/uvicorn main:app --reload --port 8000
 ```
 
-> The server trains the Random Forest model on startup. With the full 284K-row dataset this takes ~30–60 seconds.
+> The server trains the Random Forest model on startup. With the full dataset this takes ~30–60 seconds.
 
-### Start the Frontend
+### Terminal 2 — Start the Frontend
 
 ```bash
 cd frontend
@@ -221,6 +235,7 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 * [ ] **Persistent Storage** — PostgreSQL backend for analyst decisions and audit trail
 * [ ] **Email / Slack Alerts** — Real-time notifications for CRITICAL fraud flags
 * [ ] **SMOTE Oversampling** — Evaluate synthetic minority oversampling vs. class weighting
+* [ ] **Per-Account Profiling** — Track each cardholder's transaction history to detect anomalies relative to *their own* baseline (vs. the current global, account-agnostic scoring), and flag back-to-back fraud attempts from the same account
 
 ---
 

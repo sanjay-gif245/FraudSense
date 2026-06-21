@@ -20,7 +20,7 @@ function timeAgo() {
 function SkeletonRow() {
   return (
     <tr>
-      {Array.from({ length: 7 }).map((_, i) => (
+      {Array.from({ length: 8 }).map((_, i) => (
         <td key={i}><div className="skeleton" style={{ height: 14, width: i === 0 ? 90 : 50 }} /></td>
       ))}
     </tr>
@@ -50,6 +50,7 @@ export default function TransactionFeed({
           <thead>
             <tr>
               <th>Transaction ID</th>
+              <th>Time (UTC)</th>
               <th>Amount</th>
               <th>Risk Score</th>
               <th>Risk Level</th>
@@ -64,6 +65,7 @@ export default function TransactionFeed({
             {!loading && !error && transactions.map((t) => (
               <tr key={t.id}>
                 <td className="mono cell-faint">{t.id.slice(0, 8)}…</td>
+                <td className="mono cell-faint">{t.time_utc}</td>
                 <td className="mono cell-strong">
                   ${t.Amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>

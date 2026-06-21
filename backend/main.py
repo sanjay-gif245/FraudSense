@@ -13,6 +13,7 @@ used so the app still runs end-to-end (see load_and_prepare_data).
 import os
 import time
 import uuid
+from datetime import time as dtime
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException
@@ -173,6 +174,16 @@ def generate_live_transaction():
         txn[col] = float(row[col] + np.random.normal(0, 0.1))
     txn["Amount"] = float(max(0.01, row["Amount"] * (1 + np.random.uniform(-0.1, 0.1))))
     txn["Time"] = float(row["Time"])
+
+    # The dataset's "Time" feature is seconds elapsed since the first
+    # transaction in the dataset, not a wall-clock timestamp. We map it onto
+    # a 24-hour UTC clock (seconds-of-day) so analysts can see *when* during
+    # the day a transaction occurred — e.g. to spot repeated fraud at the
+    # same time of day vs. isolated incidents.
+    seconds_of_day = int(txn["Time"]) % 86400
+    clock = dtime(seconds_of_day // 3600, (seconds_of_day % 3600) // 60, seconds_of_day % 60)
+    txn["time_utc"] = clock.strftime("%H:%M:%S")
+
     return txn
 
 
