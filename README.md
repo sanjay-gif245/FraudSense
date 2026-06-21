@@ -94,7 +94,7 @@ Evaluated on a held-out **30% stratified test split** at startup. Results are st
 | **Backend** | FastAPI + Uvicorn |
 | **Frontend** | React 18 + Vite |
 | **Charts** | Recharts (AreaChart, BarChart) |
-| **Dataset** | Kaggle Credit Card Fraud Detection (`creditcard.csv`) |
+| **Dataset** | Kaggle Credit Card Fraud Detection (`creditcard_balanced.csv`) |
 | **Styling** | CSS custom properties — banking light theme |
 
 ---
@@ -106,7 +106,7 @@ FraudSense/
 ├── backend/
 │   ├── main.py                      ← FastAPI app, model training, scoring pipeline
 │   ├── data/
-│   │   └── creditcard.csv           ← Kaggle dataset (gitignored — download separately)
+│   │   └── creditcard_balanced.csv           ← Kaggle dataset (gitignored — download separately)
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/

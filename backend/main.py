@@ -5,9 +5,9 @@ Lightweight hybrid fraud detection pipeline: a supervised Random Forest
 classifier (ML layer) + a domain rule engine + a weighted fusion layer + an
 adaptive feedback loop driven by analyst confirmations.
 
-Data: Kaggle "Credit Card Fraud Detection" dataset (creditcard.csv). If the
-CSV is not present, a statistically realistic synthetic fallback is used so
-the app still runs end-to-end (see load_and_prepare_data).
+Data: balanced Credit Card Fraud Detection dataset (creditcard_balanced.csv).
+If the CSV is not present, a statistically realistic synthetic fallback is
+used so the app still runs end-to-end (see load_and_prepare_data).
 """
 
 import os
@@ -33,25 +33,24 @@ DATA_PATH = os.path.join(os.path.dirname(__file__), "data", "creditcard_balanced
 # Data loading
 # ---------------------------------------------------------------------------
 def load_and_prepare_data():
-    """Load the Kaggle creditcard.csv dataset, or fall back to a synthetic
-    dataset that mimics its statistical properties.
+    """Load the balanced creditcard_balanced.csv dataset, or fall back to a
+    synthetic dataset that mimics its statistical properties.
 
     Returns the raw dataframe (with Class column) used both for training
     and for sampling realistic live transactions.
     """
     if os.path.exists(DATA_PATH):
         df = pd.read_csv(DATA_PATH)
-        dataset_name = "creditcard.csv (Kaggle)"
+        dataset_name = "creditcard_balanced.csv"
         print(f"[FraudSense] Loaded real dataset from {DATA_PATH} "
               f"({len(df)} rows).")
     else:
-        print("[FraudSense] WARNING: backend/data/creditcard.csv not found. "
-              "Falling back to a synthetic dataset that mimics the "
-              "statistical properties of the real Kaggle Credit Card Fraud "
-              "Detection dataset. For publication-grade results, download "
-              "the real CSV from "
-              "https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud and "
-              "place it at backend/data/creditcard.csv.")
+        print("[FraudSense] WARNING: backend/data/creditcard_balanced.csv "
+              "not found. Falling back to a synthetic dataset that mimics "
+              "the statistical properties of the real Credit Card Fraud "
+              "Detection dataset. Download creditcard_balanced.csv from the "
+              "project's GitHub Releases page and place it at "
+              "backend/data/creditcard_balanced.csv.")
         n = 5000
         rng = np.random.default_rng(42)
         data = {}
