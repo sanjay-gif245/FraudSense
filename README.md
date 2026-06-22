@@ -1,262 +1,194 @@
-# 🛡️ FraudSense — Real-Time Credit Card Fraud Detection Engine
-### Hybrid Random Forest Classifier + Domain Rule Engine + Adaptive Analyst Feedback Loop
+# FraudSense
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
-![React](https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61DAFB?style=for-the-badge&logo=react&logoColor=black)
-![scikit-learn](https://img.shields.io/badge/ML-scikit--learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white)
-![Security](https://img.shields.io/badge/Domain-Financial%20Fraud-red?style=for-the-badge)
+A real-time credit card fraud detection engine. It combines a supervised Random Forest model, a set of hand-written domain rules, and a feedback loop that lets analysts correct the system as it runs.
 
----
+It's built on the Kaggle Credit Card Fraud Detection dataset (284,807 original transactions, balanced and expanded to ~568,000 here, with roughly 0.17% fraud in the raw data).
 
-## 📌 Overview
+## How it works
 
-**A production-grade fraud detection pipeline for real-time credit card transaction scoring** — built on the Kaggle Credit Card Fraud Detection dataset (284,807 transactions, 0.17% fraud prevalence).
+Every transaction goes through three layers before it gets a final score.
 
-Unlike threshold-only rule engines, FraudSense runs a **three-layer hybrid pipeline** on every transaction:
+1. **ML layer.** A Random Forest classifier trained on 70% of the dataset, scoring each transaction by its predicted probability of being fraud. The decision threshold was tuned so precision stays at or above 95% on the held-out test split.
+2. **Rule layer.** A few simple, deterministic banking rules — things like flagging unusually large amounts or transactions happening late at night. These catch patterns the model might miss.
+3. **Fusion layer.** The two scores get combined: `fusion_score = 0.6 * ml_score + 0.4 * rule_score`. A transaction is flagged when this score crosses the current threshold (it starts at 0.6 and adjusts over time).
 
-1. **ML Layer** — A supervised Random Forest classifier trained on 70% of the benchmark dataset, scoring transactions by predicted fraud probability. Threshold is tuned to guarantee **≥95% precision** on the held-out test split.
-2. **Rule Layer** — Domain heuristics (high-value amounts, off-hours timing) that catch fraud patterns models may miss.
-3. **Fusion Layer** — A 60/40 weighted combination of ML and rule scores into a single risk signal.
+On top of that, there's a feedback loop: when an analyst confirms a flagged transaction was fraud, nothing changes. When they mark it as a false positive, the threshold goes up slightly (the system gets stricter). When they catch a missed fraud, the threshold goes down (the system gets more sensitive).
 
-An **Adaptive Feedback Loop** lets analysts confirm or dismiss alerts in real time, shifting the detection threshold dynamically to suppress false positives as they accumulate.
+### Random Forest setup
 
----
+- 200 trees, class weighting set to "balanced" to deal with how rare fraud actually is
+- Trained on a 70/30 stratified split, so the reported numbers come from data the model never saw during training
+- The threshold isn't arbitrary — it's the highest value that still keeps recall as high as possible while precision stays above 95%
 
-## 🚀 Key Features
+### Rule layer
 
-### 1. 🤖 Supervised Random Forest Classifier (ML Layer)
-Trained on labeled historical transactions with class-balanced learning to handle extreme fraud rarity:
+| Rule | Trigger | Risk added |
+|---|---|---|
+| High-value amount | Amount > $2,000 | +0.5 |
+| Elevated amount | Amount > $500 | +0.2 |
+| Off-hours | Between 12am and 5am | +0.3 |
 
-| Parameter | Value |
-| :--- | :--- |
-| **Algorithm** | Random Forest Classifier |
-| **Trees** | 200 estimators |
-| **Class Weighting** | `balanced` — compensates for 0.17% fraud prevalence |
-| **Train/Test Split** | 70% train / 30% held-out test (stratified) |
-| **Threshold Strategy** | Precision-constrained search (≥95% target) maximizing recall |
+### Risk level vs. flagged status
 
-### 2. 📏 Domain Rule Engine (Rule Layer)
-Banking-domain heuristics applied deterministically on every transaction:
+These are two different things and it's easy to mix them up. The "Risk Level" badge (Low / Medium / High) you see in the dashboard is just a fixed label based on the fusion score:
 
-| Rule | Trigger | Risk Added |
-| :--- | :--- | :--- |
-| **High-Value Amount** | Amount > $2,000 | +0.5 |
-| **Elevated Amount** | Amount > $500 | +0.2 |
-| **Off-Hours Timing** | Between 12:00 AM – 5:00 AM | +0.3 |
+| Fusion score | Risk level |
+|---|---|
+| above 0.7 | High |
+| 0.4 to 0.7 | Medium |
+| below 0.4 | Low |
 
-### 3. ⚖️ Weighted Fusion Layer
-Combines ML and Rule scores into a single fraud risk score:
+Whether a transaction is actually flagged as fraud is a separate decision — it depends on the *current* adaptive threshold, which moves around based on analyst feedback. So you might see a transaction labeled "High" risk that still shows up as "Cleared," because the threshold has climbed above 0.7 after analysts corrected a bunch of false positives. That's expected behavior, not a bug.
 
-```
-fusion_score = 0.60 × ml_score + 0.40 × rule_score
-```
+### What it's actually looking at
 
-A transaction is flagged when `fusion_score > current_threshold` (adaptive, starts at 0.6).
+This scores transactions across an entire stream, not per individual customer. Each transaction is sampled independently — the model has no memory of "this card's history." It's scoring based purely on the transaction's own features (amount, time of day, and 28 anonymized PCA features from the original dataset). Tracking individual account behavior over time would be a meaningful next step, but it isn't built yet.
 
-**Risk Level criteria** (shown in the dashboard as Low / Medium / High) is derived directly from the `fusion_score`:
+## Benchmark results
 
-| Fusion Score | Risk Level |
-| :--- | :--- |
-| `> 0.7` | 🔴 High |
-| `0.4 – 0.7` | 🟡 Medium |
-| `< 0.4` | 🟢 Low |
-
-This is separate from `is_flagged` (the binary fraud/not-fraud decision), which uses the adaptive `current_threshold` instead — so a transaction can show "Medium" risk visually while still being below the flagging threshold.
-
-**Scope of analysis:** FraudSense scores transactions at the level of an entire bank's transaction stream, not a single customer's account. Each simulated transaction is sampled independently from the full Kaggle dataset (which itself aggregates anonymized card transactions across many cardholders). The model has no concept of "this card's history" — it scores each transaction purely on its own feature values (amount, time-of-day, and the 28 anonymized `V1`–`V28` PCA features). Per-account behavioral profiling (e.g. "this is unusual *for this specific customer*") is a natural extension but is not implemented here — see Future Roadmap.
-
-### 4. 🔄 Adaptive Analyst Feedback Loop
-Analysts review flagged transactions directly in the dashboard:
-
-- **Confirm Fraud** → confirmed fraud counter increments; threshold unchanged.
-- **Mark OK (False Positive)** → threshold increases by 0.02 (becomes stricter).
-- **Missed Fraud (unflagged)** → threshold decreases by 0.02 (becomes more sensitive).
-
----
-
-## 📊 Benchmark Results
-
-Evaluated on a held-out **30% stratified test split** at startup. Results are static for the session lifetime.
+These numbers come from a 30% held-out test split, computed once at startup.
 
 | Metric | Value |
-| :--- | :--- |
-| **Precision** | **95.61%** |
-| **Recall** | 73.65% |
-| **F1 Score** | 83.21% |
-| **ROC-AUC** | 94.80% |
-| **Test Samples** | 85,443 |
-| **Fraud Samples** | 148 (0.1732%) |
+|---|---|
+| Precision | 95.61% |
+| Recall | 73.65% |
+| F1 score | 83.21% |
+| ROC-AUC | 94.80% |
+| Test samples | 85,443 |
+| Fraud samples in test set | 148 (0.17%) |
 
-**Confusion Matrix (test split):**
+Confusion matrix:
 
-|  | Predicted Fraud | Predicted Normal |
-| :--- | :--- | :--- |
-| **Actual Fraud** | TP: 109 | FN: 39 |
-| **Actual Normal** | FP: 5 | TN: 85,290 |
+| | Predicted fraud | Predicted normal |
+|---|---|---|
+| Actual fraud | TP: 109 | FN: 39 |
+| Actual normal | FP: 5 | TN: 85,290 |
 
----
+## Tech stack
 
-## ⚙️ Tech Stack
+- **ML:** scikit-learn (RandomForestClassifier, StandardScaler)
+- **Backend:** FastAPI + Uvicorn
+- **Frontend:** React 18 + Vite
+- **Charts:** Recharts
+- **Dataset:** Kaggle Credit Card Fraud Detection (`creditcard_balanced.csv`)
 
-| Component | Technology |
-| :--- | :--- |
-| **ML Model** | scikit-learn `RandomForestClassifier` |
-| **Feature Scaling** | `StandardScaler` (Amount + Time columns) |
-| **Backend** | FastAPI + Uvicorn |
-| **Frontend** | React 18 + Vite |
-| **Charts** | Recharts (AreaChart, BarChart) |
-| **Dataset** | Kaggle Credit Card Fraud Detection (`creditcard_balanced.csv`) |
-| **Styling** | CSS custom properties — banking light theme |
+## Project structure
 
----
-
-## 📂 Repository Structure
-
-```text
+```
 FraudSense/
 ├── backend/
-│   ├── main.py                      ← FastAPI app, model training, scoring pipeline
+│   ├── main.py                      FastAPI app, model training, scoring logic
 │   ├── data/
-│   │   └── creditcard_balanced.csv           ← Kaggle dataset (gitignored — download separately)
+│   │   └── creditcard_balanced.csv  dataset (not checked in — download separately)
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx                  ← Root component, data fetching, page routing
+│   │   ├── App.jsx                  root component, data fetching, page routing
 │   │   ├── components/
-│   │   │   ├── Sidebar.jsx          ← Navigation sidebar
-│   │   │   ├── StatsBar.jsx         ← KPI cards (live metrics)
-│   │   │   ├── TransactionFeed.jsx  ← Scored transaction table
-│   │   │   ├── MetricsDashboard.jsx ← Confusion matrix, ROC curve, latency histogram
-│   │   │   ├── FrameworkView.jsx    ← Architecture breakdown panel
-│   │   │   └── icons.jsx            ← Inline SVG icon set
-│   │   └── index.css                ← Design tokens + banking theme
+│   │   │   ├── Sidebar.jsx
+│   │   │   ├── StatsBar.jsx         KPI cards
+│   │   │   ├── TransactionFeed.jsx  scored transaction table
+│   │   │   ├── MetricsDashboard.jsx confusion matrix, ROC curve, latency chart
+│   │   │   ├── FrameworkView.jsx    architecture breakdown
+│   │   │   └── icons.jsx
+│   │   └── index.css
 │   ├── vite.config.js
 │   └── package.json
+├── run.sh
 └── README.md
 ```
 
----
+## Setup
 
-## ⚠️ Installation & Setup
+1. Clone the repo:
+   ```bash
+   git clone https://github.com/sanjay-gif245/FraudSense.git
+   cd FraudSense
+   ```
 
-### 1. Clone the Repository
+2. Download the dataset. The CSV is too large for the repo itself, so it's hosted separately:
 
-```bash
-git clone https://github.com/YOUR_USERNAME/FraudSense.git
-cd FraudSense
-```
+   [Download creditcard_balanced.csv (GitHub Releases)](https://github.com/sanjay-gif245/FraudSense/releases/tag/v1.0)
 
-### 2. Download the Dataset
+   Place it at `backend/data/creditcard_balanced.csv`. If it's missing, the app still runs using a small synthetic dataset, but the benchmark numbers won't match the ones above.
 
-Download `creditcard_balanced.csv` from the link below and place it at `backend/data/creditcard_balanced.csv`:
+3. Install the backend:
+   ```bash
+   cd backend
+   python3 -m venv .venv
+   source .venv/bin/activate   # on Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-> 📥 **[Download Dataset (GitHub Releases)](https://github.com/sanjay-gif245/FraudSense/releases/tag/v1.0)**
+4. Install the frontend:
+   ```bash
+   cd frontend
+   npm install
+   ```
 
-```
-backend/data/creditcard_balanced.csv
-```
+## Running it
 
-> ⚠️ If the CSV is not present, the app falls back to a 5,000-row synthetic dataset that mimics the real distribution — the app runs end-to-end but benchmark metrics will differ.
-
-### 3. Install Backend Dependencies
-
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-### 4. Install Frontend Dependencies
-
-```bash
-cd frontend
-npm install
-```
-
----
-
-## 🖥️ Running the Project
-
-### Option A — One Command (Recommended)
+**Easiest way:**
 
 ```bash
 ./run.sh
 ```
 
-This starts the backend, waits until it's ready, then starts the frontend — both in one terminal. Press `Ctrl+C` to stop both. Requires the backend `.venv` and frontend `node_modules` to already be installed (see Installation & Setup above).
+This starts the backend, waits until it's actually ready, then starts the frontend — all in one terminal. Ctrl+C stops both.
 
-### Option B — Two Terminals (Manual)
+**Manual way**, if you'd rather run things yourself — you need two terminals open at once:
 
-You need **two terminals open at the same time** — one for the backend, one for the frontend. Both must keep running while you use the app.
-
-**Terminal 1 — Start the Backend**
-
+Terminal 1:
 ```bash
 cd backend
 .venv/bin/uvicorn main:app --reload --port 8000
 ```
+Wait for `Application startup complete` before moving on — with the full dataset, training takes 30-60 seconds. Opening the frontend before this finishes is the most common cause of "connection lost" errors.
 
-> The server trains the Random Forest model on startup. With the full dataset this takes ~30–60 seconds. **Wait for `Application startup complete` before opening the frontend** — if you open the dashboard too early (or skip this step entirely) you'll see "Connection lost" / `ECONNREFUSED` errors, because the frontend has nothing to talk to yet.
-
-**Terminal 2 — Start the Frontend**
-
+Terminal 2:
 ```bash
 cd frontend
 npm run dev
 ```
 
-Open **[http://localhost:5173](http://localhost:5173)** in your browser.
+Then open http://localhost:5173.
 
----
+### If you see "Connection lost" or ECONNREFUSED
 
-### ⚠️ Troubleshooting: "Connection lost" / `ECONNREFUSED` / `http proxy error`
+This just means the frontend is running but the backend isn't reachable. Usually it's one of:
 
-This means the **frontend is running but the backend is not** — the dashboard has no server to fetch data from. Fix:
+- You only started the frontend and forgot the backend — check you have a second terminal running uvicorn
+- The backend is still loading — check for `Application startup complete` in its terminal
+- The backend crashed — look for a Python traceback, which is usually caused by a missing `requirements.txt` install or the dataset CSV not being where it's expected
+- Just use `./run.sh` instead — it handles the ordering for you
 
-1. Check you have a **second terminal** running the backend (`uvicorn main:app ...`) — it's easy to only start the frontend and forget the backend.
-2. In that backend terminal, confirm you see `INFO: Application startup complete`. If you see a Python traceback instead, read the error — it usually means `requirements.txt` wasn't installed or the dataset CSV is missing/corrupted.
-3. If the backend terminal was closed or crashed, restart it with the command above.
-4. Easiest fix: use `./run.sh` instead, which starts both automatically and won't let you forget one.
+## Dashboard pages
 
----
+| Page | What it shows |
+|---|---|
+| Overview | Live KPI cards and a recent transaction feed |
+| Transaction Stream | The full rolling feed of scored transactions, with review buttons |
+| Fraud Detected | Two sections — transactions currently flagged, and transactions cleared after review |
+| Model Metrics | Confusion matrix, ROC curve, latency distribution |
+| Architecture | A breakdown of how the ML, rule, and fusion layers fit together |
 
-## 🗂️ Dashboard Pages
+## API endpoints
 
-| Page | Description |
-| :--- | :--- |
-| **Overview** | Live KPI cards + recent transaction feed |
-| **Transaction Stream** | Full rolling feed of all scored transactions with analyst review buttons |
-| **Fraud Detected** | Persistent list of every transaction flagged as high-risk |
-| **Model Metrics** | Full benchmark report — confusion matrix, ROC curve, latency histogram |
-| **Architecture** | Component-by-component breakdown of the hybrid pipeline |
+| Method | Endpoint | What it does |
+|---|---|---|
+| GET | /transaction | Scores a new transaction sampled from the dataset |
+| POST | /feedback | Submits an analyst's verdict on a flagged transaction |
+| GET | /stats | Live metrics plus the static benchmark metrics |
+| GET | /framework | Describes the architecture components |
+| GET | /benchmark | Runs a 1,000-transaction throughput test |
+| GET | /feature-importances | Returns feature importance scores |
+| GET | /health | Health check |
 
----
+## Ideas for later
 
-## 🌐 API Endpoints
-
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `GET` | `/transaction` | Score a new live transaction sampled from the dataset |
-| `POST` | `/feedback` | Submit analyst verdict (`actual_fraud: true/false`) |
-| `GET` | `/stats` | Live metrics + benchmark metrics |
-| `GET` | `/framework` | Architecture component descriptions |
-| `GET` | `/benchmark` | 1,000-transaction throughput benchmark |
-| `GET` | `/feature-importances` | Feature importance scores |
-| `GET` | `/health` | Health check |
-
----
-
-## 🔮 Future Roadmap
-
-* [ ] **PySpark Integration** — Distribute the scoring pipeline across a cluster for high-throughput environments
-* [ ] **XGBoost / LightGBM** — Benchmark alternative gradient boosting models against Random Forest
-* [ ] **SHAP Explanations** — Per-transaction feature attribution for explainable AI compliance
-* [ ] **Persistent Storage** — PostgreSQL backend for analyst decisions and audit trail
-* [ ] **Email / Slack Alerts** — Real-time notifications for CRITICAL fraud flags
-* [ ] **SMOTE Oversampling** — Evaluate synthetic minority oversampling vs. class weighting
-* [ ] **Per-Account Profiling** — Track each cardholder's transaction history to detect anomalies relative to *their own* baseline (vs. the current global, account-agnostic scoring), and flag back-to-back fraud attempts from the same account
-
----
-
+- Run the scoring pipeline on PySpark for higher throughput
+- Try XGBoost or LightGBM against the current Random Forest
+- Add SHAP explanations so individual decisions are easier to justify
+- Move from in-memory state to a real database (Postgres) for analyst decisions and audit history
+- Send alerts over email or Slack for critical flags
+- Track each cardholder's own transaction history instead of scoring everything independently — this would let the system catch things that are unusual *for that specific account*, not just unusual in general
